@@ -1,0 +1,29 @@
+{
+  "name": "space",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp run -r build",
+    "dev": "concurrently -k -n runtime,desktop -c cyan,magenta \"vp run @space/runtime#dev\" \"vp run @space/desktop#dev\"",
+    "predev": "vp run @space/protocol#build",
+    "dev:desktop": "vp run @space/desktop#dev",
+    "dev:runtime": "vp run @space/runtime#dev",
+    "test": "vp test run",
+    "test:e2e": "vp run @space/desktop#test:e2e",
+    "test:package": "vp run build && vp run @space/desktop#package:dir && vp run @space/desktop#test:package",
+    "typecheck": "vp check --no-fmt --no-lint",
+    "package": "vp run build && vp run @space/desktop#package"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.10.0"
+}
