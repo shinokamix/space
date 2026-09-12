@@ -1,39 +1,21 @@
 # Space
 
-Монорепозиторий десктопного приложения с отдельным runtime-процессом.
+Space puts coding agents, terminals, browsers, files, diffs, and notes on one canvas. Each task has its own workspace and saved layout. Projects group related workspaces, so you can switch tasks without rebuilding their context.
 
-## Что внутри
+## Why Space
 
-```text
-apps/
-  desktop/     Electron, React 19, Vite+, Tailwind, Base UI, Zustand
-  runtime/     Node 24, Effect, Effect SQL, SQLite, node-pty
-packages/
-  protocol/    общие Effect Schema контракты для HTTP и WebSocket
-```
+Coding agents can work on several tasks at once, but your attention still moves between them. Each task spreads across terminal windows, browser tabs, editors, and conversations. When you return, you have to find those pieces and remember where you stopped.
 
-Desktop показывает рабочее поле на React Flow и терминал xterm.js. Runtime принимает команды по HTTP, отправляет события и терминальный поток через WebSocket, а состояние хранит в SQLite.
+Space keeps the tools and information for a task in one stable layout. The canvas makes the workspace itself a reminder of what belongs together. Research into [programming-task resumption](https://sites.cc.gatech.edu/reverse/repository/resumptionstrategies.pdf), [contextual cues](https://www.microsoft.com/en-us/research/publication/evaluating-cues-for-resuming-interrupted-programming-tasks/), and [spatial memory](https://www.microsoft.com/en-us/research/publication/data-mountain-using-spatial-memory-for-document-management/) motivates this design.
 
-В dev-режиме runtime запускается системным Node 24. Упакованное приложение запускает его отдельным дочерним процессом через Electron с `ELECTRON_RUN_AS_NODE=1`. Electron 43 включает Node 24.
-
-## Требования
-
-- Vite+ CLI
-- системные инструменты сборки для нативных модулей `node-pty` и `better-sqlite3`
-
-## Запуск
+## Development
 
 ```bash
-curl -fsSL https://vite.plus | bash
 vp install
 vp run dev
 ```
 
-Vite+ читает Node 24 из `.node-version` и использует pnpm 11.10.0 из `packageManager`.
-
-Runtime слушает только `127.0.0.1:4310`. Путь к базе можно задать через `SPACE_DATABASE_PATH`, порт через `SPACE_RUNTIME_PORT`, а адрес runtime в renderer через `VITE_RUNTIME_URL`.
-
-## Проверки
+Run these checks before submitting a change:
 
 ```bash
 vp check
@@ -42,18 +24,14 @@ vp run test:e2e
 vp run build
 ```
 
-## Упаковка
+Create a desktop package with:
 
 ```bash
 vp run package
 ```
 
-`electron-builder` создаёт артефакты в `apps/desktop/release`. Для локальной проверки без DMG или установщика можно выполнить `vp run @space/desktop#package:dir` после `vp run build`.
+The packages are written to `apps/desktop/release`.
 
-## Протокол
+## License
 
-- `GET /health` проверяет доступность runtime.
-- `POST /commands/sessions` создаёт PTY-сессию.
-- `WS /events` передаёт события runtime и терминальные данные в обе стороны.
-
-Схемы лежат в `packages/protocol`. Сейчас HTTP и WebSocket доступны любому локальному процессу. Перед добавлением опасных команд нужен токен сессии и проверка `Origin`.
+Space is available under the [MIT License](LICENSE).
