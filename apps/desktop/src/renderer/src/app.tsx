@@ -1,21 +1,17 @@
-import { useEffect } from "react";
 import { CircleDot, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { TerminalPanel } from "@/components/terminal-panel";
-import { WorkspaceCanvas } from "@/components/workspace-canvas";
-import { useWorkspaceStore } from "@/store/workspace";
+import { useEffect } from "react";
 
-const runtimeUrl = import.meta.env.VITE_RUNTIME_URL ?? "http://127.0.0.1:4310";
+import { TerminalPanel } from "@/components/terminal-panel";
+import { Button } from "@/components/ui/button";
+import { WorkspaceCanvas } from "@/components/workspace-canvas";
+import { runtimeClient } from "@/lib/runtime-client";
+import { useWorkspaceStore } from "@/store/workspace";
 
 export const App = () => {
   const { runtimeStatus, setRuntimeStatus } = useWorkspaceStore();
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch(`${runtimeUrl}/health`, { signal: controller.signal })
-      .then((response) => setRuntimeStatus(response.ok ? "online" : "offline"))
-      .catch(() => setRuntimeStatus("offline"));
-    return () => controller.abort();
+    return runtimeClient.subscribeStatus(setRuntimeStatus);
   }, [setRuntimeStatus]);
 
   return (

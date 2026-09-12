@@ -1,22 +1,38 @@
-import { Effect } from "effect";
-import { DatabaseLive, migrate } from "./database.js";
 import { createRuntimeServer } from "./server.js";
 
 const port = Number(process.env.SPACE_RUNTIME_PORT ?? 4310);
+const token = process.env.SPACE_RUNTIME_TOKEN;
 
-const program = Effect.gen(function* () {
-  yield* migrate;
-  const server = createRuntimeServer();
-  yield* Effect.async<void, Error>((resume) => {
-    server.once("error", (error) => resume(Effect.fail(error)));
-    server.listen(port, "127.0.0.1", () => {
-      console.log(`Space runtime listening on http://127.0.0.1:${port}`);
+if (!token) throw new Error("SPACE_RUNTIME_TOKEN is required");
+
+try {
+  const server = createRuntimeServer({ token });
+  let shuttingDown = false;
+  const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void server.shutdown().catch((error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
     });
-    return Effect.sync(() => server.close());
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  server.once("error", (error) => {
+    console.error(error);
+    process.exitCode = 1;
+    shutdown();
   });
-}).pipe(Effect.provide(DatabaseLive));
-
-Effect.runPromise(program).catch((error: unknown) => {
+  server.listen(port, "127.0.0.1", () => {
+    const address = server.address();
+    if (typeof address === "string" || address === null) {
+      server.close();
+      throw new Error("Runtime did not receive a TCP port");
+    }
+    console.log(`Space runtime listening on http://127.0.0.1:${address.port}`);
+    process.send?.({ type: "space.runtime.ready", port: address.port });
+  });
+} catch (error) {
   console.error(error);
   process.exitCode = 1;
-});
+}

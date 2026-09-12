@@ -12,3 +12,5 @@ test-results
 *.db-wal
 .env
 .env.local
+.vscode/
+.vite-hooks/_

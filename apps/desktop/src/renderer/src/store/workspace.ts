@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { create } from "zustand";
 
-type RuntimeStatus = "connecting" | "online" | "offline";
+import type { RuntimeStatus } from "@/lib/runtime-client";
 
 interface WorkspaceState {
   edges: Edge[];

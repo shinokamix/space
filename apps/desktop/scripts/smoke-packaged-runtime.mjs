@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -6,9 +7,9 @@ import { join } from "node:path";
 import process from "node:process";
 
 const platformDirectory = {
-  darwin: `mac-${process.arch}`,
-  linux: `linux-${process.arch}-unpacked`,
-  win32: `win-${process.arch}-unpacked`,
+  darwin: process.arch === "arm64" ? "mac-arm64" : "mac",
+  linux: "linux-unpacked",
+  win32: "win-unpacked",
 }[process.platform];
 
 if (!platformDirectory) throw new Error(`Unsupported platform: ${process.platform}`);
@@ -43,12 +44,14 @@ const reservePort = () =>
 
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "space-packaged-runtime-"));
 const port = await reservePort();
+const token = randomBytes(32).toString("base64url");
 const child = spawn(executable, [entry], {
   env: {
     ...process.env,
     ELECTRON_RUN_AS_NODE: "1",
     SPACE_DATABASE_PATH: join(temporaryDirectory, "space.db"),
     SPACE_RUNTIME_PORT: String(port),
+    SPACE_RUNTIME_TOKEN: token,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -69,7 +72,9 @@ try {
       throw new Error(`Packaged runtime exited with code ${child.exitCode}\n${output}`);
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      const response = await fetch(`http://127.0.0.1:${port}/health`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const health = await response.json();
         if (health.status !== "ok")

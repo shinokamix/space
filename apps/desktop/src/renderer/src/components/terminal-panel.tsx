@@ -1,13 +1,28 @@
-import { useEffect, useRef } from "react";
 import * as FitAddonModule from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import "@xterm/xterm/css/xterm.css";
-import type { RuntimeEvent } from "@space/protocol";
+import { useEffect, useRef, useState } from "react";
 
-const runtimeUrl = import.meta.env.VITE_RUNTIME_URL ?? "http://127.0.0.1:4310";
+import "@xterm/xterm/css/xterm.css";
+import { runtimeClient } from "@/lib/runtime-client";
+import type { TerminalExit } from "@space/protocol";
+
+const formatTerminalExit = (exit: TerminalExit) => {
+  switch (exit.reason) {
+    case "process-exit":
+      return `Process exited with code ${exit.code}`;
+    case "runtime-restart":
+      return "Process ended because the runtime restarted";
+    case "spawn-error":
+      return "Process failed to start";
+    case "user-stop":
+      return "Process stopped";
+  }
+};
 
 export const TerminalPanel = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [terminalLifecycle, setTerminalLifecycle] = useState(0);
+  const [canRestart, setCanRestart] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -23,35 +38,50 @@ export const TerminalPanel = () => {
     terminal.loadAddon(fit);
     terminal.open(container);
     fit.fit();
-    terminal.writeln("Connecting to Space runtime...");
+    terminal.writeln(
+      terminalLifecycle === 0 ? "Connecting to Space runtime..." : "Starting a new terminal...",
+    );
+    setCanRestart(false);
 
-    const socket = new WebSocket(runtimeUrl.replace(/^http/, "ws") + "/events");
+    let disposed = false;
+    const abortController = new AbortController();
+    let unsubscribe: (() => void) | undefined;
     let sessionId: string | undefined;
 
-    socket.addEventListener("open", () => {
-      void fetch(`${runtimeUrl}/commands/sessions`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
+    void runtimeClient
+      .getOrCreateTerminal("terminal", abortController.signal)
+      .then((createdSessionId) => {
+        if (disposed) return;
+        sessionId = createdSessionId;
+        unsubscribe = runtimeClient.subscribeTerminal(createdSessionId, (event) => {
+          if (event.type === "terminal.snapshot") {
+            terminal.reset();
+            terminal.write(event.data);
+            if (event.status === "exited") {
+              terminal.writeln(`\r\n${formatTerminalExit(event.exit)}`);
+              runtimeClient.releaseTerminal("terminal", createdSessionId);
+              setCanRestart(true);
+            } else {
+              terminal.focus();
+            }
+          }
+          if (event.type === "terminal.data") terminal.write(event.data);
+          if (event.type === "terminal.exit") {
+            terminal.writeln(`\r\n${formatTerminalExit(event.exit)}`);
+            runtimeClient.releaseTerminal("terminal", createdSessionId);
+            setCanRestart(true);
+          }
+          if (event.type === "runtime.error") terminal.writeln(`\r\n${event.message}`);
+        });
       })
-        .then((response) => response.json() as Promise<{ sessionId: string }>)
-        .then((response) => {
-          sessionId = response.sessionId;
-          terminal.focus();
-        })
-        .catch((error: unknown) => terminal.writeln(`\r\nRuntime error: ${String(error)}`));
-    });
-    socket.addEventListener("message", ({ data }) => {
-      const event = JSON.parse(String(data)) as RuntimeEvent;
-      if (event.type === "terminal.data" && event.sessionId === sessionId)
-        terminal.write(event.data);
-      if (event.type === "runtime.error") terminal.writeln(`\r\n${event.message}`);
-    });
+      .catch((error: unknown) => {
+        if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
+          terminal.writeln(`\r\nRuntime error: ${String(error)}`);
+        }
+      });
 
     const input = terminal.onData((data) => {
-      if (sessionId && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "terminal.input", sessionId, data }));
-      }
+      if (sessionId) runtimeClient.sendTerminalInput(sessionId, data);
     });
     let resizeFrame: number | undefined;
     const resize = new ResizeObserver(() => {
@@ -59,28 +89,36 @@ export const TerminalPanel = () => {
       resizeFrame = requestAnimationFrame(() => {
         resizeFrame = undefined;
         fit.fit();
-        if (sessionId && socket.readyState === WebSocket.OPEN) {
-          socket.send(
-            JSON.stringify({
-              type: "terminal.resize",
-              sessionId,
-              cols: terminal.cols,
-              rows: terminal.rows,
-            }),
-          );
+        if (sessionId && terminal.cols > 0 && terminal.rows > 0) {
+          runtimeClient.resizeTerminal(sessionId, terminal.cols, terminal.rows);
         }
       });
     });
     resize.observe(container);
 
     return () => {
+      disposed = true;
+      abortController.abort();
       input.dispose();
       resize.disconnect();
       if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
-      socket.close();
+      unsubscribe?.();
       terminal.dispose();
     };
-  }, []);
+  }, [terminalLifecycle]);
 
-  return <div ref={containerRef} className="h-full w-full overflow-hidden p-3" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full overflow-hidden p-3" />
+      {canRestart ? (
+        <button
+          type="button"
+          className="absolute top-3 right-4 rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800"
+          onClick={() => setTerminalLifecycle((value) => value + 1)}
+        >
+          Restart terminal
+        </button>
+      ) : null}
+    </div>
+  );
 };

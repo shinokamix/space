@@ -1,5 +1,6 @@
 appId: dev.space.desktop
 productName: Space
+executableName: space
 directories:
   output: release
 files:
