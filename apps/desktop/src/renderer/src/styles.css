@@ -13,9 +13,23 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
 input {
   font: inherit;
+}
+
+.react-flow__node-terminal {
+  border: 0;
+  padding: 0;
+}
+
+.react-flow__pane {
+  cursor: default;
+}
+
+.react-flow__pane.dragging {
+  cursor: grabbing;
 }

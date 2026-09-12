@@ -1,9 +1,9 @@
 import * as FitAddonModule from "@xterm/addon-fit";
-import { Terminal } from "@xterm/xterm";
+import { Terminal as Xterm } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
 
 import "@xterm/xterm/css/xterm.css";
-import { runtimeClient } from "@/lib/runtime-client";
+import { runtimeClient } from "@/shared/runtime";
 import type { TerminalExit } from "@space/protocol";
 
 const formatTerminalExit = (exit: TerminalExit) => {
@@ -19,7 +19,11 @@ const formatTerminalExit = (exit: TerminalExit) => {
   }
 };
 
-export const TerminalPanel = () => {
+interface TerminalProps {
+  panelId: string;
+}
+
+export const Terminal = ({ panelId }: TerminalProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [terminalLifecycle, setTerminalLifecycle] = useState(0);
   const [canRestart, setCanRestart] = useState(false);
@@ -28,7 +32,7 @@ export const TerminalPanel = () => {
     const container = containerRef.current;
     if (!container) return;
 
-    const terminal = new Terminal({
+    const terminal = new Xterm({
       cursorBlink: true,
       fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
       fontSize: 13,
@@ -49,7 +53,7 @@ export const TerminalPanel = () => {
     let sessionId: string | undefined;
 
     void runtimeClient
-      .getOrCreateTerminal("terminal", abortController.signal)
+      .getOrCreateTerminal(panelId, abortController.signal)
       .then((createdSessionId) => {
         if (disposed) return;
         sessionId = createdSessionId;
@@ -59,7 +63,7 @@ export const TerminalPanel = () => {
             terminal.write(event.data);
             if (event.status === "exited") {
               terminal.writeln(`\r\n${formatTerminalExit(event.exit)}`);
-              runtimeClient.releaseTerminal("terminal", createdSessionId);
+              runtimeClient.releaseTerminal(panelId, createdSessionId);
               setCanRestart(true);
             } else {
               terminal.focus();
@@ -68,7 +72,7 @@ export const TerminalPanel = () => {
           if (event.type === "terminal.data") terminal.write(event.data);
           if (event.type === "terminal.exit") {
             terminal.writeln(`\r\n${formatTerminalExit(event.exit)}`);
-            runtimeClient.releaseTerminal("terminal", createdSessionId);
+            runtimeClient.releaseTerminal(panelId, createdSessionId);
             setCanRestart(true);
           }
           if (event.type === "runtime.error") terminal.writeln(`\r\n${event.message}`);
@@ -105,11 +109,11 @@ export const TerminalPanel = () => {
       unsubscribe?.();
       terminal.dispose();
     };
-  }, [terminalLifecycle]);
+  }, [panelId, terminalLifecycle]);
 
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full overflow-hidden p-3" />
+    <div className="relative h-full w-full bg-[#09090b]">
+      <div ref={containerRef} className="h-full w-full overflow-hidden px-3 pt-2 pb-3" />
       {canRestart ? (
         <button
           type="button"

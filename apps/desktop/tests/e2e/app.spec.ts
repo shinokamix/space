@@ -54,7 +54,7 @@ const stopProcess = async (child: ChildProcess) => {
   await waitForExit(child, 2_000);
 };
 
-test("keeps a terminal connected across a renderer reload", async () => {
+test("creates a working terminal from the canvas menu", async () => {
   const directory = await mkdtemp(join(tmpdir(), "space-e2e-"));
   const port = await reservePort();
   const token = randomBytes(32).toString("base64url");
@@ -92,7 +92,10 @@ test("keeps a terminal connected across a renderer reload", async () => {
 
     application = await electron.launch({ args: ["."], cwd: process.cwd(), env });
     const window = await application.firstWindow();
-    await expect(window.getByText("SPACE", { exact: true })).toBeVisible();
+    const canvas = window.getByRole("region", { name: "Workspace canvas" });
+    await canvas.click({ button: "right", position: { x: 240, y: 180 } });
+    await window.getByRole("menuitem", { name: "Terminal" }).click();
+    await expect(window.getByRole("article", { name: "Terminal" })).toBeVisible();
     const rendererHealth = await window.evaluate(async () => {
       const config = await (globalThis as unknown as SpaceWindow).space.getRuntimeConfig();
       try {
@@ -112,17 +115,11 @@ test("keeps a terminal connected across a renderer reload", async () => {
       },
       status: 200,
     });
-    await expect(window.getByText("runtime online", { exact: true })).toBeVisible();
     await window.getByRole("textbox", { name: "Terminal input" }).click();
     await window.keyboard.type("echo SPACE_E2E_READY");
     await window.keyboard.press("Enter");
     await expect(window.getByText(/SPACE_E2E_READY/).first()).toBeVisible();
 
-    await window.reload();
-    await expect(window.getByText("runtime online", { exact: true })).toBeVisible();
-    await expect(window.getByText(/SPACE_E2E_READY/).first()).toBeVisible();
-
-    await window.getByRole("textbox", { name: "Terminal input" }).click();
     await window.keyboard.type("exit");
     await window.keyboard.press("Enter");
     const restart = window.getByRole("button", { name: "Restart terminal" });

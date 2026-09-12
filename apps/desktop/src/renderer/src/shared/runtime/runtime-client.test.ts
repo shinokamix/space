@@ -7,7 +7,7 @@ const { getRuntimeConfig } = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@/lib/runtime", () => ({ getRuntimeConfig }));
+vi.mock("@/shared/runtime/runtime-config", () => ({ getRuntimeConfig }));
 
 import { RuntimeClient } from "./runtime-client";
 

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { getRuntimeConfig } from "@/lib/runtime";
+import { getRuntimeConfig } from "@/shared/runtime/runtime-config";
 import {
   CreateSessionResponse,
   RuntimeEvent,
