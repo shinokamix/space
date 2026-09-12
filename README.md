@@ -35,3 +35,4 @@ The packages are written to `apps/desktop/release`.
 ## License
 
 Space is available under the [MIT License](LICENSE).
+# harness-pareto
